@@ -146,7 +146,137 @@ def logout():
 # Placeholders for future dashboards
 @app.route('/admin/dashboard')
 def admin_dashboard():
-    return f"Welcome Admin! (Dashboard coming in Step 3)"
+    if session.get('role') != 'admin':
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('home'))
+
+    search_query = request.args.get('search', '').strip()
+
+    # Query metrics
+    total_users = User.query.filter_by(role='user').count()
+    total_staff = User.query.filter_by(role='staff').count()
+    total_treks = Trek.query.count()
+    total_bookings = Booking.query.count()
+
+    # Filtered Users
+    users_query = User.query.filter(User.role != 'admin')
+    if search_query:
+        if search_query.isdigit():
+            users_query = users_query.filter(User.id == int(search_query))
+        else:
+            users_query = users_query.filter(User.name.ilike(f"%{search_query}%"))
+    users = users_query.all()
+
+    # Filtered Treks
+    treks_query = Trek.query
+    if search_query:
+        if search_query.isdigit():
+            treks_query = treks_query.filter(Trek.id == int(search_query))
+        else:
+            treks_query = treks_query.filter(Trek.name.ilike(f"%{search_query}%"))
+    treks = treks_query.all()
+
+    # Get approved staff list for assigning to new treks
+    approved_staff = User.query.filter_by(role='staff', status='approved').all()
+
+    return render_template(
+        'admin_dashboard.html',
+        total_treks=total_treks,
+        total_users=total_users,
+        total_staff= total_staff,
+        total_bookings=total_bookings,
+        users=users,
+        treks=treks,
+        approved_staff=approved_staff,
+        search_query=search_query
+    )
+
+
+@app.route('/admin/approve-staff/<int:user_id>')
+def approve_staff(user_id):
+    if session.get('role') != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    staff_user = User.query.get_or_404(user_id)
+    if staff_user.role == 'staff':
+        staff_user.status = 'approved'
+        db.session.commit()
+        flash(f'Staff account for {staff_user.name} has been approved!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/toggle-blacklist/<int:user_id>')
+def toggle_blacklist(user_id):
+    if session.get('role') != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    user = User.query.get_or_404(user_id)
+    if user.role != 'admin':
+        if user.status == 'blacklisted':
+            user.status = 'approved' if user.role == 'user' else 'pending'
+            flash(f'User {user.name} removed from blacklist.', 'info')
+        else:
+            user.status = 'blacklisted'
+            flash(f'User {user.name} has been blacklisted.', 'warning')
+        db.session.commit()
+
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/create-trek', methods=['POST'])
+def create_trek():
+    if session.get('role') != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    name = request.form.get('name')
+    location = request.form.get('location')
+    difficulty = request.form.get('difficulty')
+    duration_days = request.form.get('duration_days')
+    available_slots = request.form.get('available_slots')
+    start_date = request.form.get('start_date')
+    end_date = request.form.get('end_date')
+    assigned_staff_id = request.form.get('assigned_staff_id')
+
+    # Convert empty staff string to None
+    staff_id = int(assigned_staff_id) if assigned_staff_id else None
+    # Check for date overlap if a staff member is assigned
+    if staff_id:
+        # Find all existing treks assigned to this staff member
+        staff_treks = Trek.query.filter_by(assigned_staff_id=staff_id).all()
+        
+        for trek in staff_treks:
+            # Overlap formula: (StartA <= EndB) and (EndA >= StartB)
+            if (start_date <= trek.end_date) and (end_date >= trek.start_date):
+                staff_user = User.query.get(staff_id)
+                flash(
+                    f'Conflict: Staff member "{staff_user.name}" is already assigned to trek "{trek.name}" '
+                    f'from {trek.start_date} to {trek.end_date}.',
+                    'danger'
+                )
+                return redirect(url_for('admin_dashboard'))
+
+    new_trek = Trek(
+        name=name,
+        location=location,
+        difficulty=difficulty,
+        duration_days=int(duration_days),
+        available_slots=int(available_slots),
+        start_date=start_date,
+        end_date=end_date,
+        assigned_staff_id=staff_id
+    )
+
+    db.session.add(new_trek)
+    db.session.commit()
+
+    flash(f'Trek "{name}" created successfully!', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+
+
 
 @app.route('/staff/dashboard')
 def staff_dashboard():
