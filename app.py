@@ -143,7 +143,10 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
-# Placeholders for future dashboards
+# ======================
+#ADMIN DASHBOARD
+# ======================
+
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if session.get('role') != 'admin':
@@ -276,11 +279,62 @@ def create_trek():
     return redirect(url_for('admin_dashboard'))
 
 
-
+#=============================
+#STAFF DASHBOARD 
+# ============================
 
 @app.route('/staff/dashboard')
 def staff_dashboard():
-    return f"Welcome Staff! (Dashboard coming in Step 4)"
+    # Role & Status Check
+    if session.get('role') != 'staff':
+        flash('Access denied. Staff privileges required.', 'danger')
+        return redirect(url_for('home'))
+
+    current_user = User.query.get(session['user_id'])
+    if current_user.status != 'approved':
+        flash('Your account is not approved by the admin yet.', 'warning')
+        return redirect(url_for('logout'))
+
+    # Query treks assigned to this specific staff member
+    assigned_treks = Trek.query.filter_by(assigned_staff_id=current_user.id).all()
+
+    # Bundle trek info with registered bookings
+    trek_data = []
+    for trek in assigned_treks:
+        active_bookings = Booking.query.filter_by(trek_id=trek.id).all()
+        trek_data.append({
+            'trek': trek,
+            'bookings': active_bookings,
+            'booking_count': len(active_bookings)
+        })
+
+    return render_template('staff_dashboard.html', assigned_treks=assigned_treks, trek_data=trek_data)
+
+
+@app.route('/staff/update-trek/<int:trek_id>', methods=['POST'])
+def update_trek_staff(trek_id):
+    if session.get('role') != 'staff':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    trek = Trek.query.get_or_404(trek_id)
+
+    # Security Check: Ensure staff can ONLY update treks assigned to THEM
+    if trek.assigned_staff_id != session.get('user_id'):
+        flash('Security Alert: You can only manage treks assigned to you.', 'danger')
+        return redirect(url_for('staff_dashboard'))
+
+    new_slots = request.form.get('available_slots')
+    new_status = request.form.get('status')
+
+    if new_slots is not None:
+        trek.available_slots = int(new_slots)
+    if new_status:
+        trek.status = new_status
+
+    db.session.commit()
+    flash(f'Trek "{trek.name}" details updated successfully!', 'success')
+    return redirect(url_for('staff_dashboard'))
 
 @app.route('/user/dashboard')
 def user_dashboard():
