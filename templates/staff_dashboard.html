@@ -7,6 +7,32 @@
     <h2 class="text-center mb-4">Trek Staff Dashboard</h2>
 
     <h3 class="mb-3">My Assigned Treks</h3>
+    <div class="card mb-4">
+
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">My Treks</h5>
+    </div>
+
+    <div class="card-body">
+
+        {% for item in trek_data %}
+
+            {% if item.trek.status != "Completed" %}
+
+                <a href="#trek-{{ item.trek.id }}"
+                   class="btn btn-outline-primary btn-sm m-1">
+
+                    {{ item.trek.name }}
+
+                </a>
+
+            {% endif %}
+
+        {% endfor %}
+
+    </div>
+
+</div>
 
     {% if trek_data %}
 
@@ -14,7 +40,7 @@
 
         {% set trek = item.trek %}
 
-        <div class="card mb-4 p-3">
+        <div class="card mb-4 p-3" id="trek-{{ trek.id }}">
 
             <h4>{{ trek.name }}</h4>
 

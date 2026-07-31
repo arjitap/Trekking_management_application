@@ -1,0 +1,338 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="container mt-5 mb-5">
+
+    <h2 class="text-center mb-4">Trekker Dashboard</h2>
+
+    <!-- EDIT PROFILE -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">Edit Profile</h4>
+        </div>
+
+        <div class="card-body">
+
+            <form action="{{ url_for('update_user_profile') }}" method="POST">
+
+                <div class="mb-3">
+
+                    <label class="form-label">Full Name</label>
+
+                    <input
+                        type="text"
+                        name="name"
+                        class="form-control"
+                        value="{{ current_user.name }}"
+                        required>
+
+                </div>
+
+                <div class="mb-3">
+
+                    <label class="form-label">Contact Number</label>
+
+                    <input
+                        type="text"
+                        name="contact_no"
+                        class="form-control"
+                        value="{{ current_user.contact_no }}"
+                        required>
+
+                </div>
+
+                <button type="submit" class="btn btn-success">
+                    Save Changes
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- MY BOOKINGS -->
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header bg-success text-white">
+            <h4 class="mb-0">My Bookings</h4>
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-bordered table-striped table-hover">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Booking ID</th>
+                        <th>Trek</th>
+                        <th>Location</th>
+                        <th>Booking Date</th>
+                        <th>Trek Status</th>
+                        <th>Booking Status</th>
+                        <th>Action</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for booking in user_bookings %}
+
+                    <tr>
+
+                        <td>{{ booking.id }}</td>
+
+                        <td>{{ booking.trek.name }}</td>
+
+                        <td>{{ booking.trek.location }}</td>
+
+                        <td>{{ booking.booking_date.strftime('%Y-%m-%d') }}</td>
+
+                        <td>{{ booking.trek.status }}</td>
+
+                        <td>{{ booking.status }}</td>
+
+                        <td>
+
+                            {% if booking.status == "Booked" and booking.trek.status == "Open" %}
+
+                                <a href="{{ url_for('cancel_booking', booking_id=booking.id) }}"
+                                   class="btn btn-danger btn-sm">
+
+                                    Cancel
+
+                                </a>
+
+                            {% else %}
+
+                                -
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="7" class="text-center">
+
+                            No bookings available.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- SEARCH TREKS -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-header bg-warning">
+        <h4 class="mb-0">Search Treks</h4>
+    </div>
+
+    <div class="card-body">
+
+        <form action="{{ url_for('user_dashboard') }}" method="GET">
+
+            <div class="mb-3">
+
+                <label class="form-label">Search by Trek Name or Location</label>
+
+                <input
+                    type="text"
+                    name="search"
+                    class="form-control"
+                    placeholder="Enter trek name or location"
+                    value="{{ search_query }}">
+
+            </div>
+
+            <div class="mb-3">
+
+                <label class="form-label">Difficulty</label>
+
+                <select name="difficulty" class="form-select">
+
+                    <option value="">All Treks</option>
+
+                    <option value="Easy"
+                        {% if selected_difficulty == "Easy" %}
+                            selected
+                        {% endif %}>
+                        Easy
+                    </option>
+
+                    <option value="Moderate"
+                        {% if selected_difficulty == "Moderate" %}
+                            selected
+                        {% endif %}>
+                        Moderate
+                    </option>
+
+                    <option value="Hard"
+                        {% if selected_difficulty == "Hard" %}
+                            selected
+                        {% endif %}>
+                        Hard
+                    </option>
+
+                </select>
+
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                Search
+            </button>
+
+            <a href="{{ url_for('user_dashboard') }}"
+               class="btn btn-secondary">
+                Reset
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+    <!-- AVAILABLE TREKS -->
+
+    <div class="card shadow-sm">
+
+        <div class="card-header bg-info text-white">
+            <h4 class="mb-0">Available Treks</h4>
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-bordered table-striped table-hover">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Name</th>
+                        <th>Location</th>
+                        <th>Difficulty</th>
+                        <th>Duration</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Slots</th>
+                        <th>Action</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for trek in open_treks %}
+
+                    <tr>
+
+                        <td>{{ trek.name }}</td>
+
+                        <td>{{ trek.location }}</td>
+
+                        <td>{{ trek.difficulty }}</td>
+
+                        <td>{{ trek.duration_days }} Days</td>
+
+                        <td>{{ trek.start_date }}</td>
+
+                        <td>{{ trek.end_date }}</td>
+
+                        <td>
+
+                            <strong>{{ trek.available_slots }}</strong>
+
+                        </td>
+
+                        <td>
+
+                            {% if trek.id in booked_trek_ids %}
+
+                                <button
+                                    class="btn btn-success btn-sm"
+                                    disabled>
+
+                                    Already Booked
+
+                                </button>
+
+                            {% elif trek.available_slots > 0 %}
+
+                                <a
+                                    href="{{ url_for('book_trek', trek_id=trek.id) }}"
+                                    class="btn btn-primary btn-sm">
+
+                                    Book Now
+
+                                </a>
+
+                            {% else %}
+
+                                <button
+                                    class="btn btn-secondary btn-sm"
+                                    disabled>
+
+                                    Fully Booked
+
+                                </button>
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td colspan="8" class="text-center">
+
+                            No treks available.
+
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

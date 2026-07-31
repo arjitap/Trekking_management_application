@@ -336,9 +336,140 @@ def update_trek_staff(trek_id):
     flash(f'Trek "{trek.name}" details updated successfully!', 'success')
     return redirect(url_for('staff_dashboard'))
 
+
+
+#===========================
+#USER DASHBOARD 
+#===========================
+
+
 @app.route('/user/dashboard')
 def user_dashboard():
-    return f"Welcome Trekker! (Dashboard coming in Step 5)"
+    if session.get('role') != 'user':
+        flash('Access denied. Trekker privileges required.', 'danger')
+        return redirect(url_for('home'))
+
+    user_id = session.get('user_id')
+    current_user = User.query.get(user_id)
+
+    # Search & Filter Parameters
+    search_query = request.args.get('search', '').strip()
+    selected_difficulty = request.args.get('difficulty', '').strip()
+
+    # Query User's Bookings
+    user_bookings = Booking.query.filter_by(user_id=user_id).order_by(Booking.booking_date.desc()).all()
+    
+    # IDs of treks user has already booked 
+    booked_trek_ids = [b.trek_id for b in user_bookings if b.status == 'Booked']
+
+    # Query Available Open Treks
+    treks_query = Trek.query.filter_by(status='Open')
+
+    if search_query:
+        treks_query = treks_query.filter(
+            (Trek.name.ilike(f"%{search_query}%")) | (Trek.location.ilike(f"%{search_query}%"))
+        )
+    if selected_difficulty:
+        treks_query = treks_query.filter(Trek.difficulty == selected_difficulty)
+
+    open_treks = treks_query.all()
+
+    return render_template(
+        'user_dashboard.html',
+        current_user=current_user,
+        user_bookings=user_bookings,
+        open_treks=open_treks,
+        booked_trek_ids=booked_trek_ids,
+        search_query=search_query,
+        selected_difficulty=selected_difficulty
+    )
+
+
+@app.route('/user/book-trek/<int:trek_id>')
+def book_trek(trek_id):
+    if session.get('role') != 'user':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    user_id = session.get('user_id')
+    trek = Trek.query.get_or_404(trek_id)
+
+    # Constraint Check 1: Trek must be Open
+    if trek.status != 'Open':
+        flash('Booking Failed: This trek is not currently open for registration.', 'danger')
+        return redirect(url_for('user_dashboard'))
+
+    # Constraint Check 2: Prevent Overbooking
+    if trek.available_slots <= 0:
+        flash('Booking Failed: No available slots left for this trek.', 'danger')
+        return redirect(url_for('user_dashboard'))
+
+    # Constraint Check 3: Prevent duplicate active booking
+    existing_booking = Booking.query.filter_by(user_id=user_id, trek_id=trek_id, status='Booked').first()
+    if existing_booking:
+        flash('You have already booked this trek.', 'warning')
+        return redirect(url_for('user_dashboard'))
+
+    # Create Booking
+    new_booking = Booking(
+        user_id=user_id,
+        trek_id=trek.id,
+        status='Booked'
+    )
+
+    # Reduce available slots
+    trek.available_slots -= 1
+
+    db.session.add(new_booking)
+    db.session.commit()
+
+    flash(f'Successfully booked "{trek.name}"!', 'success')
+    return redirect(url_for('user_dashboard'))
+
+
+@app.route('/user/cancel-booking/<int:booking_id>')
+def cancel_booking(booking_id):
+    if session.get('role') != 'user':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    user_id = session.get('user_id')
+    booking = Booking.query.get_or_404(booking_id)
+
+    # Security check: User can only cancel their own booking
+    if booking.user_id != user_id:
+        flash('Unauthorized action.', 'danger')
+        return redirect(url_for('user_dashboard'))
+
+    if booking.status == 'Booked':
+        booking.status = 'Cancelled'
+        # Restore slot back to trek
+        booking.trek.available_slots += 1
+        db.session.commit()
+        flash('Booking cancelled successfully.', 'info')
+
+    return redirect(url_for('user_dashboard'))
+
+
+@app.route('/user/update-profile', methods=['POST'])
+def update_user_profile():
+    if session.get('role') != 'user':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    current_user = User.query.get(session['user_id'])
+    new_name = request.form.get('name')
+    new_contact = request.form.get('contact_no')
+
+    if new_name:
+        current_user.name = new_name
+        session['name'] = new_name  # Update session name too
+    if new_contact:
+        current_user.contact_no = new_contact
+
+    db.session.commit()
+    flash('Profile updated successfully!', 'success')
+    return redirect(url_for('user_dashboard'))
 
 
 # ==========================================
