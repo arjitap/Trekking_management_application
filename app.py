@@ -152,35 +152,34 @@ def admin_dashboard():
     if session.get('role') != 'admin':
         flash('Access denied. Admin privileges required.', 'danger')
         return redirect(url_for('home'))
-
+    role_filter= request.args.get("role","all")
     search_query = request.args.get('search', '').strip()
+    query = User.query.filter(User.role != 'admin')
 
+    # Apply role filter
+    if role_filter in ['user', 'staff']:
+        query = query.filter(User.role == role_filter)
+
+
+    # Apply search filter (Name or ID)
+    if search_query:
+        if search_query.isdigit():
+            query = query.filter((User.id == int(search_query)) | (User.name.ilike(f'%{search_query}%')))
+        else:
+            query = query.filter(User.name.ilike(f'%{search_query}%'))
+
+    users = query.order_by(User.id.desc()).all()
     # Query metrics
     total_users = User.query.filter_by(role='user').count()
     total_staff = User.query.filter_by(role='staff').count()
     total_treks = Trek.query.count()
     total_bookings = Booking.query.count()
 
-    # Filtered Users
-    users_query = User.query.filter(User.role != 'admin')
-    if search_query:
-        if search_query.isdigit():
-            users_query = users_query.filter(User.id == int(search_query))
-        else:
-            users_query = users_query.filter(User.name.ilike(f"%{search_query}%"))
-    users = users_query.all()
-
-    # Filtered Treks
-    treks_query = Trek.query
-    if search_query:
-        if search_query.isdigit():
-            treks_query = treks_query.filter(Trek.id == int(search_query))
-        else:
-            treks_query = treks_query.filter(Trek.name.ilike(f"%{search_query}%"))
-    treks = treks_query.all()
-
-    # Get approved staff list for assigning to new treks
+    
+    
+    treks = Trek.query.order_by(Trek.id.desc()).limit(5).all()
     approved_staff = User.query.filter_by(role='staff', status='approved').all()
+    
 
     return render_template(
         'admin_dashboard.html',
@@ -194,7 +193,31 @@ def admin_dashboard():
         search_query=search_query
     )
 
+@app.route('/admin/all-users')
+def admin_all_users():
+    if session.get('role') != 'admin':
+        return redirect(url_for('home'))
+    
+    all_users = User.query.filter(User.role != 'admin').order_by(User.id.desc()).all()
+    return render_template('admin_all_users.html', users=all_users)
 
+
+@app.route('/admin/all-bookings')
+def admin_all_bookings():
+    if session.get('role') != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    all_bookings = Booking.query.order_by(Booking.booking_date.desc()).all()
+    return render_template('admin_all_bookings.html', bookings=all_bookings)
+
+@app.route('/admin/all-treks')
+def admin_all_treks():
+    if session.get('role') != 'admin':
+        return redirect(url_for('home'))
+
+    all_treks = Trek.query.order_by(Trek.id.desc()).all()
+    return render_template('admin_all_treks.html', treks=all_treks)
 @app.route('/admin/approve-staff/<int:user_id>')
 def approve_staff(user_id):
     if session.get('role') != 'admin':
@@ -278,6 +301,51 @@ def create_trek():
     flash(f'Trek "{name}" created successfully!', 'success')
     return redirect(url_for('admin_dashboard'))
 
+# Edit Trek Route
+@app.route('/admin/trek/edit/<int:trek_id>', methods=['GET', 'POST'])
+def edit_trek(trek_id):
+    if session.get('role') != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    trek = Trek.query.get_or_404(trek_id)
+    approved_staff = User.query.filter_by(role='staff', status='approved').all()
+
+    if request.method == 'POST':
+        trek.name = request.form.get('name')
+        trek.location = request.form.get('location')
+        trek.difficulty = request.form.get('difficulty')
+        trek.duration_days = int(request.form.get('duration_days'))
+        trek.available_slots = int(request.form.get('available_slots'))
+        
+        staff_id = request.form.get('assigned_staff_id')
+        trek.assigned_staff_id = int(staff_id) if staff_id else None
+        
+        trek.start_date = request.form.get('start_date')
+        trek.end_date = request.form.get('end_date')
+        trek.status = request.form.get('status')
+
+        db.session.commit()
+        flash('Trek updated successfully!', 'success')
+        return redirect(url_for('admin_all_treks'))
+
+    return render_template('edit_trek.html', trek=trek, approved_staff=approved_staff)
+
+
+# Delete Trek Route
+@app.route('/admin/trek/delete/<int:trek_id>', methods=['POST'])
+def delete_trek(trek_id):
+    if session.get('role') != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+
+    trek = Trek.query.get_or_404(trek_id)
+    db.session.delete(trek)
+    db.session.commit()
+    flash('Trek deleted successfully!', 'success')
+    return redirect(url_for('admin_all_treks'))
+
+
 
 #=============================
 #STAFF DASHBOARD 
@@ -301,6 +369,7 @@ def staff_dashboard():
     # Bundle trek info with registered bookings
     trek_data = []
     for trek in assigned_treks:
+        all_bookings = Booking.query.filter_by(trek_id=trek.id).all()
         active_bookings = Booking.query.filter_by(trek_id=trek.id).all()
         trek_data.append({
             'trek': trek,
@@ -326,6 +395,13 @@ def update_trek_staff(trek_id):
 
     new_slots = request.form.get('available_slots')
     new_status = request.form.get('status')
+    if new_status:
+        trek.status = new_status
+        # AUTO-UPDATE BOOKINGS IF TREK COMPLETED
+        if new_status == 'Completed':
+            bookings = Booking.query.filter_by(trek_id=trek.id, status='Booked').all()
+            for b in bookings:
+                b.status = 'Completed'
 
     if new_slots is not None:
         trek.available_slots = int(new_slots)

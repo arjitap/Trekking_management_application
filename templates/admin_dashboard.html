@@ -35,8 +35,11 @@
 
     <div id="summary" class="card mb-4">
 
-        <div class="card-header bg-dark text-white shadow">
-            <h4>Dashboard Summary</h4>
+        <div class="card-header bg-dark text-white shadow d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Dashboard Summary</h4>
+            <a href="{{ url_for('admin_all_bookings') }}" class="btn btn-sm btn-outline-light">
+                View All Bookings →
+            </a>
         </div>
 
         <div class="card-body">
@@ -92,19 +95,13 @@
                 </div>
 
                 <div class="col-md-3 mb-3">
-
-                    <div class="card text-center border-danger">
-
+                    <div class="card text-center border-danger shadow-sm">
                         <div class="card-body">
-
                             <h5>Total Bookings</h5>
-
                             <h2>{{ total_bookings }}</h2>
 
                         </div>
-
                     </div>
-
                 </div>
 
             </div>
@@ -113,357 +110,278 @@
 
     </div>
 
+</div>
 
-    <!-- ================= Search ================= -->
 
-    <div class="card mb-4">
 
-        <div class="card-header bg-dark text-white">
 
-            <h4>Search Users & Staff</h4>
+<!-- ================= Search ================= -->
 
-        </div>
+<div class="card mb-4 shadow-sm">
 
-        <div class="card-body">
+    <div class="card-header bg-dark text-white shadow d-flex justify-content-between align-items-center">
 
-            <form action="{{ url_for('admin_dashboard') }}" method="GET">
-
-                <div class="row">
-
-                    <div class="col-md-3">
-
-                        <label>Role</label>
-
-                        <select name="role" class="form-select">
-
-                            <option value="all">All</option>
-                            <option value="user">Users</option>
-                            <option value="staff">Staff</option>
-
-                        </select>
-
-                    </div>
-
-                    <div class="col-md-7">
-
-                        <label>Search</label>
-
-                        <input
-                            type="text"
-                            name="search"
-                            class="form-control"
-                            placeholder="Enter Name or ID">
-
-                    </div>
-
-                    <div class="col-md-2 d-flex align-items-end">
-
-                        <button class="btn btn-primary w-100">
-
-                            Search
-
-                        </button>
-
-                    </div>
-
-                </div>
-
-            </form>
-
-        </div>
+        <h4>Search Users & Staff</h4>
 
     </div>
 
+    <div class="card-body">
 
-    <!-- ================= Users ================= -->
+        <form action="{{ url_for('admin_dashboard') }}" method="GET">
 
-    <div id="users" class="card mb-4">
+            <div class="row">
 
-        <div class="card-header bg-dark text-white">
+                <div class="col-md-3">
 
-            <h4>Manage Users & Staff</h4>
+                    <label>Role</label>
 
-        </div>
+                    <select name="role" class="form-select">
 
-        <div class="card-body">
+                        <option value="all">All</option>
+                        <option value="user">Users</option>
+                        <option value="staff">Staff</option>
 
-            <table class="table table-bordered table-hover">
+                    </select>
 
-                <thead>
+                </div>
 
-                    <tr>
+                <div class="col-md-7">
 
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Action</th>
+                    <label>Search</label>
 
-                    </tr>
+                    <input type="text" name="search" class="form-control" placeholder="Enter Name or ID">
 
-                </thead>
+                </div>
 
-                <tbody>
+                <div class="col-md-2 d-flex align-items-end">
 
+                    <button class="btn btn-primary w-100">
+
+                        Search
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<!-- ================= Users(Only recent 5 ) ================= -->
+
+<div id="users" class="card mb-4">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">Recent Users & Staff</h4>
+        <!-- LINK TO DEDICATED ALL USERS PAGE -->
+        <a href="{{ url_for('admin_all_users') }}" class="btn btn-sm btn-outline-light">View All Users →</a>
+    </div>
+
+    <div class="card-body">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
                 {% for user in users %}
+                {% if user.role != 'admin' %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.role }}</td>
+                    <td>{{ user.status }}</td>
+                    <td>
+                        {% if user.status=="pending" %}
+                        <a href="{{ url_for('approve_staff', user_id=user.id) }}"
+                            class="btn btn-success btn-sm">Approve</a>
+                        {% endif %}
 
-                    {% if user.role != 'admin' %}
-
-                    <tr>
-
-                        <td>{{ user.id }}</td>
-
-                        <td>{{ user.name }}</td>
-
-                        <td>{{ user.email }}</td>
-
-                        <td>{{ user.role }}</td>
-
-                        <td>{{ user.status }}</td>
-
-                        <td>
-
-                            {% if user.status=="pending" %}
-
-                                <a
-                                href="{{ url_for('approve_staff', user_id=user.id) }}"
-                                class="btn btn-success btn-sm">
-
-                                    Approve
-
-                                </a>
-
-                            {% endif %}
-
-                            {% if user.status!="blacklisted" %}
-
-                                <a
-                                href="{{ url_for('toggle_blacklist', user_id=user.id) }}"
-                                class="btn btn-danger btn-sm">
-
-                                    Blacklist
-
-                                </a>
-
-                            {% else %}
-
-                                <a
-                                href="{{ url_for('toggle_blacklist', user_id=user.id) }}"
-                                class="btn btn-success btn-sm">
-
-                                    Unblacklist
-
-                                </a>
-
-                            {% endif %}
-
-                        </td>
-
-                    </tr>
-
-                    {% endif %}
-
+                        {% if user.status!="blacklisted" %}
+                        <a href="{{ url_for('toggle_blacklist', user_id=user.id) }}"
+                            class="btn btn-danger btn-sm">Blacklist</a>
+                        {% else %}
+                        <a href="{{ url_for('toggle_blacklist', user_id=user.id) }}"
+                            class="btn btn-success btn-sm">Unblacklist</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
                 {% else %}
-
-                    <tr>
-
-                        <td colspan="6" class="text-center">
-
-                            No Users Found
-
-                        </td>
-
-                    </tr>
-
+                <tr>
+                    <td colspan="6" class="text-center">No Users Found</td>
+                </tr>
                 {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 
-                </tbody>
+<!-- ================= Create Trek ================= -->
 
-            </table>
+<div id="create" class="card mb-4">
 
-        </div>
+    <div class="card-header bg-dark text-white">
+
+        <h4>Create New Trek</h4>
 
     </div>
 
+    <div class="card-body">
 
+        <form action="{{ url_for('create_trek') }}" method="POST">
 
-    <!-- ================= Create Trek ================= -->
+            <div class="row">
 
-    <div id="create" class="card mb-4">
+                <div class="col-md-6 mb-3">
 
-        <div class="card-header bg-dark text-white">
+                    <label>Trek Name</label>
 
-            <h4>Create New Trek</h4>
-
-        </div>
-
-        <div class="card-body">
-
-            <form action="{{ url_for('create_trek') }}" method="POST">
-
-                <div class="row">
-
-                    <div class="col-md-6 mb-3">
-
-                        <label>Trek Name</label>
-
-                        <input
-                        type="text"
-                        name="name"
-                        class="form-control"
-                        required>
-
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-
-                        <label>Location</label>
-
-                        <input
-                        type="text"
-                        name="location"
-                        class="form-control"
-                        required>
-
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-
-                        <label>Difficulty</label>
-
-                        <select
-                        name="difficulty"
-                        class="form-select">
-
-                            <option>Easy</option>
-                            <option>Moderate</option>
-                            <option>Hard</option>
-
-                        </select>
-
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-
-                        <label>Duration</label>
-
-                        <input
-                        type="number"
-                        name="duration_days"
-                        class="form-control"
-                        required>
-
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-
-                        <label>Available Slots</label>
-
-                        <input
-                        type="number"
-                        name="available_slots"
-                        class="form-control"
-                        required>
-
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-
-                        <label>Assign Staff</label>
-
-                        <select
-                        name="assigned_staff_id"
-                        class="form-select">
-
-                            <option value="">Select Staff</option>
-
-                            {% for staff in approved_staff %}
-
-                            <option value="{{ staff.id }}">
-
-                                {{ staff.name }}
-
-                            </option>
-
-                            {% endfor %}
-
-                        </select>
-
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-
-                        <label>Start Date</label>
-
-                        <input
-                        type="date"
-                        name="start_date"
-                        class="form-control"
-                        required>
-
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-
-                        <label>End Date</label>
-
-                        <input
-                        type="date"
-                        name="end_date"
-                        class="form-control"
-                        required>
-
-                    </div>
+                    <input type="text" name="name" class="form-control" required>
 
                 </div>
 
-                <button class="btn btn-success">
+                <div class="col-md-6 mb-3">
 
-                    Save Trek
+                    <label>Location</label>
 
-                </button>
+                    <input type="text" name="location" class="form-control" required>
 
-            </form>
+                </div>
 
-        </div>
+                <div class="col-md-6 mb-3">
+
+                    <label>Difficulty</label>
+
+                    <select name="difficulty" class="form-select">
+
+                        <option>Easy</option>
+                        <option>Moderate</option>
+                        <option>Hard</option>
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-6 mb-3">
+
+                    <label>Duration</label>
+
+                    <input type="number" name="duration_days" class="form-control" required>
+
+                </div>
+
+                <div class="col-md-6 mb-3">
+
+                    <label>Available Slots</label>
+
+                    <input type="number" name="available_slots" class="form-control" required>
+
+                </div>
+
+                <div class="col-md-6 mb-3">
+
+                    <label>Assign Staff</label>
+
+                    <select name="assigned_staff_id" class="form-select">
+
+                        <option value="">Select Staff</option>
+
+                        {% for staff in approved_staff %}
+
+                        <option value="{{ staff.id }}">
+
+                            {{ staff.name }}
+
+                        </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-6 mb-3">
+
+                    <label>Start Date</label>
+
+                    <input type="date" name="start_date" class="form-control" required>
+
+                </div>
+
+                <div class="col-md-6 mb-3">
+
+                    <label>End Date</label>
+
+                    <input type="date" name="end_date" class="form-control" required>
+
+                </div>
+
+            </div>
+
+            <button class="btn btn-success">
+
+                Save Trek
+
+            </button>
+
+        </form>
 
     </div>
 
+</div>
 
 
-    <!-- ================= Trek List ================= -->
 
-    <div id="treks" class="card mb-5">
+<!-- ================= Trek List ================= -->
 
-        <div class="card-header bg-dark text-white">
+<!-- ================= Trek List (Recent 5 View) ================= -->
 
-            <h4>All Treks</h4>
+<div id="treks" class="card mb-5">
 
-        </div>
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
 
-        <div class="card-body">
+        <h4 class="mb-0">Recent Treks</h4>
 
-            <table class="table table-bordered table-hover">
+        <!-- VIEW ALL TREKS BUTTON -->
+        <a href="{{ url_for('admin_all_treks') }}" class="btn btn-sm btn-outline-light">
+            View All Treks →
+        </a>
 
-                <thead>
+    </div>
+    <div class="card-body">
 
-                    <tr>
+        <table class="table table-bordered table-hover">
 
-                        <th>ID</th>
-                        <th>Name</th>
-                        <th>Location</th>
-                        <th>Difficulty</th>
-                        <th>Duration</th>
-                        <th>Slots</th>
-                        <th>Assigned Staff</th>
-                        <th>Status</th>
+            <thead>
 
-                    </tr>
+                <tr>
 
-                </thead>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th>Difficulty</th>
+                    <th>Duration</th>
+                    <th>Slots</th>
+                    <th>Assigned Staff</th>
+                    <th>Status</th>
 
-                <tbody>
+                </tr>
+
+            </thead>
+
+            <tbody>
 
                 {% for trek in treks %}
 
@@ -485,11 +403,11 @@
 
                         {% if trek.assigned_staff %}
 
-                            {{ trek.assigned_staff.name }}
+                        {{ trek.assigned_staff.name }}
 
                         {% else %}
 
-                            Not Assigned
+                        Not Assigned
 
                         {% endif %}
 
@@ -513,13 +431,13 @@
 
                 {% endfor %}
 
-                </tbody>
+            </tbody>
 
-            </table>
-
-        </div>
+        </table>
 
     </div>
+
+</div>
 
 </div>
 
