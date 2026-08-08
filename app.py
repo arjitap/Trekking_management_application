@@ -34,8 +34,8 @@ class Trek(db.Model):
     duration_days = db.Column(db.Integer, nullable=False)
     available_slots = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), default='Open')
-    start_date = db.Column(db.String(20), nullable=False)
-    end_date = db.Column(db.String(20), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
     
     assigned_staff_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     bookings = db.relationship('Booking', backref='trek', lazy=True)
@@ -168,12 +168,12 @@ def admin_dashboard():
         else:
             query = query.filter(User.name.ilike(f'%{search_query}%'))
 
-    users = query.order_by(User.id.desc()).all()
+    users = query.order_by(User.id.desc()).limit(5).all()
     # Query metrics
     total_users = User.query.filter_by(role='user').count()
     total_staff = User.query.filter_by(role='staff').count()
     total_treks = Trek.query.count()
-    total_bookings = Booking.query.count()
+    total_bookings = Booking.query.filter(Booking.status!="Cancelled").count()
 
     
     
@@ -260,22 +260,27 @@ def create_trek():
     name = request.form.get('name')
     location = request.form.get('location')
     difficulty = request.form.get('difficulty')
-    duration_days = request.form.get('duration_days')
-    available_slots = request.form.get('available_slots')
-    start_date = request.form.get('start_date')
-    end_date = request.form.get('end_date')
+    duration_days = int(request.form.get('duration_days') or 0 )
+    available_slots = int(request.form.get('available_slots') or 0)
+    start_date_str = request.form.get('start_date')
+    end_date_str = request.form.get('end_date')
     assigned_staff_id = request.form.get('assigned_staff_id')
-
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else None
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
+    except ValueError:
+        flash('Invalid date format provided.', 'danger')
+        return redirect(url_for('admin_dashboard'))
     # Convert empty staff string to None
-    staff_id = int(assigned_staff_id) if assigned_staff_id else None
+    staff_id = int(assigned_staff_id) if assigned_staff_id and assigned_staff_id.strip() != '' else None
     # Check for date overlap if a staff member is assigned
-    if staff_id:
+    if staff_id and start_date and end_date:
         # Find all existing treks assigned to this staff member
         staff_treks = Trek.query.filter_by(assigned_staff_id=staff_id).all()
         
         for trek in staff_treks:
-            # Overlap formula: (StartA <= EndB) and (EndA >= StartB)
-            if (start_date <= trek.end_date) and (end_date >= trek.start_date):
+            
+            if (start_date <= str(trek.end_date)) and (end_date >= str(trek.start_date)):
                 staff_user = User.query.get(staff_id)
                 flash(
                     f'Conflict: Staff member "{staff_user.name}" is already assigned to trek "{trek.name}" '
@@ -292,7 +297,8 @@ def create_trek():
         available_slots=int(available_slots),
         start_date=start_date,
         end_date=end_date,
-        assigned_staff_id=staff_id
+        assigned_staff_id=staff_id,
+        status = "Open"
     )
 
     db.session.add(new_trek)
@@ -315,14 +321,18 @@ def edit_trek(trek_id):
         trek.name = request.form.get('name')
         trek.location = request.form.get('location')
         trek.difficulty = request.form.get('difficulty')
-        trek.duration_days = int(request.form.get('duration_days'))
-        trek.available_slots = int(request.form.get('available_slots'))
+        trek.duration_days = int(request.form.get('duration_days') or 0 )
+        trek.available_slots = int(request.form.get('available_slots')or 0 )
         
         staff_id = request.form.get('assigned_staff_id')
         trek.assigned_staff_id = int(staff_id) if staff_id else None
         
-        trek.start_date = request.form.get('start_date')
-        trek.end_date = request.form.get('end_date')
+        start_date_str = request.form.get('start_date')
+        end_date_str = request.form.get('end_date')
+        if start_date_str:
+            trek.start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        if end_date_str:
+            trek.end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
         trek.status = request.form.get('status')
 
         db.session.commit()
@@ -370,11 +380,12 @@ def staff_dashboard():
     trek_data = []
     for trek in assigned_treks:
         all_bookings = Booking.query.filter_by(trek_id=trek.id).all()
-        active_bookings = Booking.query.filter_by(trek_id=trek.id).all()
+        active_count = Booking.query.filter_by(trek_id=trek.id, status='Booked').count()
         trek_data.append({
             'trek': trek,
-            'bookings': active_bookings,
-            'booking_count': len(active_bookings)
+            'bookings': all_bookings,
+            'active_count': active_count,
+            'booking_count': len(all_bookings)
         })
 
     return render_template('staff_dashboard.html', assigned_treks=assigned_treks, trek_data=trek_data)
@@ -403,10 +414,9 @@ def update_trek_staff(trek_id):
             for b in bookings:
                 b.status = 'Completed'
 
-    if new_slots is not None:
+    if new_slots is not None and new_slots != " ":
         trek.available_slots = int(new_slots)
-    if new_status:
-        trek.status = new_status
+    
 
     db.session.commit()
     flash(f'Trek "{trek.name}" details updated successfully!', 'success')
