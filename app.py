@@ -280,7 +280,7 @@ def create_trek():
         
         for trek in staff_treks:
             
-            if (start_date <= str(trek.end_date)) and (end_date >= str(trek.start_date)):
+            if (start_date <= trek.end_date) and (end_date >= trek.start_date):
                 staff_user = User.query.get(staff_id)
                 flash(
                     f'Conflict: Staff member "{staff_user.name}" is already assigned to trek "{trek.name}" '
@@ -306,6 +306,32 @@ def create_trek():
 
     flash(f'Trek "{name}" created successfully!', 'success')
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/search_treks', methods=['GET'])
+def admin_search_treks():
+    query = request.args.get('query', '').strip()
+    difficulty = request.args.get('difficulty', '').strip()
+    location = request.args.get('location', '').strip()
+
+    trek_query = Trek.query
+
+    # Apply search filter by name or ID
+    if query:
+        if query.isdigit():
+            trek_query = trek_query.filter((Trek.name.ilike(f"%{query}%")) | (Trek.id == int(query)))
+        else:
+            trek_query = trek_query.filter(Trek.name.ilike(f"%{query}%"))
+
+    # Apply difficulty filter
+    if difficulty:
+        trek_query = trek_query.filter(Trek.difficulty == difficulty)
+
+    # Apply location filter
+    if location:
+        trek_query = trek_query.filter(Trek.location.ilike(f"%{location}%"))
+
+    results = trek_query.all()
+    return render_template('admin_all_treks.html', treks=results, query=query, difficulty=difficulty, location=location)
 
 # Edit Trek Route
 @app.route('/admin/trek/edit/<int:trek_id>', methods=['GET', 'POST'])
